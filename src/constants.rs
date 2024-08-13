@@ -1,33 +1,35 @@
-use std::collections::HashMap;
 use reqwest::Method;
+use std::collections::HashMap;
 
 pub mod Driver {
-    pub const HOST :&'static str = "http://127.0.0.1";
-    pub const PORT :&'static str = "4444";
-    pub const ARGS_PORT :&'static str = "-p";
-    pub const ARGS_VERBOSITY :&'static str = "-v";
+    pub const HOST: &'static str = "http://127.0.0.1";
+    pub const PORT: &'static str = "4444";
+    pub const ARGS_PORT: &'static str = "-p";
+    pub const ARGS_VERBOSITY: &'static str = "-v";
 }
 
 pub struct WebdriverCmd<'a> {
     pub verb: &'a str,
-    pub path: &'a str
+    pub path: &'a str,
 }
 
 impl<'a, 'b> From<(&'a str, &'a str)> for WebdriverCmd<'b>
-where 'a: 'b{
+where
+    'a: 'b,
+{
     fn from(inp: (&'a str, &'a str)) -> Self {
         WebdriverCmd {
             verb: inp.0,
-            path: inp.1
+            path: inp.1,
         }
     }
 }
 
 pub struct Firefox<'a> {
-  pub command_dict : HashMap<&'a str, WebdriverCmd<'a>> 
+    pub command_dict: HashMap<&'a str, WebdriverCmd<'a>>,
 }
 
-impl<'a> Firefox<'a>{
+impl<'a> Firefox<'a> {
     pub fn new() -> Self {
         Self {
             command_dict: HashMap::from([

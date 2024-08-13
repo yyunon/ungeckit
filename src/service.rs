@@ -1,26 +1,25 @@
 use log::*;
-use std::io::{self};
 use std::error::Error;
-use tokio::task::JoinHandle;
-use tokio::runtime::{Handle, Runtime, RuntimeMetrics};
+use std::io::{self};
+use std::process::Stdio;
 use std::sync::{Arc, Mutex};
-use tokio::process::{Command};
-use tokio::io::{BufReader, AsyncBufReadExt};
-use std::process::Stdio ;
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::process::Command;
+use tokio::runtime::{Handle, Runtime, RuntimeMetrics};
+use tokio::task::JoinHandle;
 
 use crate::error::GeckError;
 
 pub struct Context {
     pub handle: Handle,
-    pub runtime: Option<Runtime>
+    pub runtime: Option<Runtime>,
 }
 impl Context {
-
     pub fn new() -> Arc<Mutex<Self>> {
         let (handle, runtime) = Self::get_current_runtime();
         Arc::new(Mutex::new(Self {
             handle: handle,
-            runtime: runtime
+            runtime: runtime,
         }))
     }
 
@@ -29,13 +28,13 @@ impl Context {
             Ok(handle) => {
                 debug!("Getting current runtime");
                 (handle, None)
-            }, 
-            Err(_) =>{
+            }
+            Err(_) => {
                 debug!("Creating a runtime as there is no runtime...");
                 let rt = tokio::runtime::Builder::new_multi_thread()
-                                    .enable_all()
-                                    .build()
-                                    .unwrap();
+                    .enable_all()
+                    .build()
+                    .unwrap();
                 (rt.handle().clone(), Some(rt))
             }
         }
@@ -43,12 +42,11 @@ impl Context {
 
     pub fn abort_if_exists(task: &Option<JoinHandle<Result<(), io::Error>>>) {
         // TODO assert!(self.geckodriver_service.as_mut().unwrap().await.unwrap_err().is_cancelled()); Can run on async
-        if let Some(t) = task{
+        if let Some(t) = task {
             info!("Found a task handle, so closing it...");
             t.abort();
         }
     }
-
 }
 pub struct Service {
     driver_path: String,
@@ -58,8 +56,6 @@ pub struct Service {
     stderr_service: Option<JoinHandle<Result<(), io::Error>>>,
 }
 impl Service {
-
-
     pub fn new(context: &Arc<Mutex<Context>>, driver_path: &String) -> Self {
         Self {
             driver_path: driver_path.clone(),
@@ -70,21 +66,24 @@ impl Service {
         }
     }
 
-    pub async fn start_async(&mut self, args: Vec<&'static str>) -> std::result::Result<(), GeckError> {
+    pub async fn start_async(
+        &mut self,
+        args: Vec<&'static str>,
+    ) -> std::result::Result<(), GeckError> {
         let d_path = self.driver_path.clone();
         let c_args = args.clone();
         let mut command = Command::new(d_path);
-        let mut output =  command
-                        .args(c_args)
-                        .stdout(Stdio::piped())
-                        .stderr(Stdio::piped())
-                        .kill_on_drop(true)
-                        .spawn()
-                        .expect("Failed to spawn process geckodriver!");
-        
+        let mut output = command
+            .args(c_args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()
+            .expect("Failed to spawn process geckodriver!");
+
         let stdout = output.stdout.take().expect("Failed to take stdout!");
         let stderr = output.stderr.take().expect("Failed to take stderr!");
-        
+
         // A task to to spawn to retrieve command output
         self.stdout_service = Some(tokio::spawn(async move {
             let mut reader = BufReader::new(stdout).lines();
@@ -93,7 +92,7 @@ impl Service {
             }
             Ok(())
         }));
-        
+
         // A task to to spawn to retrieve command output
         self.stderr_service = Some(tokio::spawn(async move {
             let mut reader = BufReader::new(stderr).lines();
@@ -102,7 +101,7 @@ impl Service {
             }
             Ok(())
         }));
-        
+
         // A task to to spawn to run the command
         self.geckodriver_service = Some(tokio::spawn(async move {
             let status = output.wait().await.expect("Failed to run geckodriver!");
@@ -122,17 +121,17 @@ impl Service {
         let c_args = args.clone();
         self.context.lock().unwrap().handle.block_on(async {
             let mut command = Command::new(d_path);
-            let mut output =  command
-                            .args(c_args)
-                            .stdout(Stdio::piped())
-                            .stderr(Stdio::piped())
-                            .kill_on_drop(true)
-                            .spawn()
-                            .expect("Failed to spawn process geckodriver!");
-            
+            let mut output = command
+                .args(c_args)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .kill_on_drop(true)
+                .spawn()
+                .expect("Failed to spawn process geckodriver!");
+
             let stdout = output.stdout.take().expect("Failed to take stdout!");
             let stderr = output.stderr.take().expect("Failed to take stderr!");
-            
+
             // A task to to spawn to retrieve command output
             self.stdout_service = Some(tokio::spawn(async move {
                 let mut reader = BufReader::new(stdout).lines();
@@ -141,7 +140,7 @@ impl Service {
                 }
                 Ok(())
             }));
-            
+
             // A task to to spawn to retrieve command output
             self.stderr_service = Some(tokio::spawn(async move {
                 let mut reader = BufReader::new(stderr).lines();
@@ -150,7 +149,7 @@ impl Service {
                 }
                 Ok(())
             }));
-            
+
             // A task to to spawn to run the command
             self.geckodriver_service = Some(tokio::spawn(async move {
                 let status = output.wait().await.expect("Failed to run geckodriver!");
@@ -161,13 +160,10 @@ impl Service {
                     panic!("Driver service failed with status {}", status)
                 }
             }));
-
         });
         debug!("Spawned driver service...");
         Ok(())
     }
-
-
 }
 
 impl Drop for Service {

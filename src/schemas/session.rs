@@ -1,19 +1,21 @@
-use std::error::Error;
 use bytes::Bytes;
-use serde::{self, de, Serialize, Deserialize};
+use serde::{self, de, Deserialize, Serialize};
+use std::error::Error;
 
 use crate::error::GeckError;
 
 pub struct SchemaParser {}
 
-pub trait TryParse<T>{
-	fn try_parse_response(body_bytes: Bytes) -> Result<T, GeckError>
-	where T: de::DeserializeOwned;
+pub trait TryParse<T> {
+    fn try_parse_response(body_bytes: Bytes) -> Result<T, GeckError>
+    where
+        T: de::DeserializeOwned;
 }
 
 impl<T> TryParse<T> for SchemaParser {
-    fn try_parse_response(body_bytes: Bytes) -> Result<T, GeckError> 
-		where T: de::DeserializeOwned
+    fn try_parse_response(body_bytes: Bytes) -> Result<T, GeckError>
+    where
+        T: de::DeserializeOwned,
     {
         let b = body_bytes.to_vec();
         let body_text = String::from_utf8_lossy(&b);
@@ -22,43 +24,42 @@ impl<T> TryParse<T> for SchemaParser {
     }
 }
 
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Proxy {
-	// TODO implement
+    // TODO implement
 }
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Timeouts {
     pub implicit: i64,
     pub pageLoad: i64,
-    pub script: i64
+    pub script: i64,
 }
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Capabilities {
     pub acceptInsecureCerts: bool,
     pub browserName: String,
     pub browserVersion: String,
-    #[serde(alias="moz:accessibilityChecks")]
+    #[serde(alias = "moz:accessibilityChecks")]
     pub moz_accessibilityChecks: bool,
-    #[serde(alias="moz:buildID")]
+    #[serde(alias = "moz:buildID")]
     pub moz_buildID: String,
-    #[serde(alias="moz:debuggerAddress")]
+    #[serde(alias = "moz:debuggerAddress")]
     pub moz_debuggerAddress: String,
-    #[serde(alias="moz:geckodriverVersion")]
+    #[serde(alias = "moz:geckodriverVersion")]
     pub moz_geckodriverVersion: String,
-    #[serde(alias="moz:headless")]
+    #[serde(alias = "moz:headless")]
     pub moz_headless: bool,
-    #[serde(alias="moz:platformVersion")]
+    #[serde(alias = "moz:platformVersion")]
     pub moz_platformVersion: String,
-    #[serde(alias="moz:processID")]
+    #[serde(alias = "moz:processID")]
     pub moz_processID: i64,
-    #[serde(alias="moz:profile")]
+    #[serde(alias = "moz:profile")]
     pub moz_profile: String,
-    #[serde(alias="moz:shutdownTimeout")]
+    #[serde(alias = "moz:shutdownTimeout")]
     pub moz_shutdownTimeout: i64,
-    #[serde(alias="moz:webdriverClick")]
+    #[serde(alias = "moz:webdriverClick")]
     pub moz_webdriverClick: bool,
-    #[serde(alias="moz:windowless")]
+    #[serde(alias = "moz:windowless")]
     pub moz_windowless: bool,
     pub pageLoadStrategy: String,
     pub platformName: String,
