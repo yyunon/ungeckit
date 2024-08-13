@@ -1,25 +1,12 @@
-use constants::WebdriverCmd;
 use core::str;
-use futures::TryFutureExt;
 use reqwest::header::HeaderMap;
-use serde::de::{self, DeserializeOwned};
-use serde::Deserialize;
+use serde::de::{self};
 use std::convert::From;
-use std::error::Error;
-use std::fmt::format;
-use std::io::{self};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
-use tokio::io::AsyncReadExt;
-use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::Command;
-use tokio::runtime::{Handle, Runtime, RuntimeMetrics};
-use tokio::task::JoinHandle;
-use tracing_subscriber::field::debug;
 
 use bytes::Bytes;
-use log::*;
-use reqwest::{self, Method, Request, RequestBuilder, Response, Url};
+use reqwest::{self, Method, Request, RequestBuilder, Url};
 
 pub mod constants;
 pub mod error;
@@ -173,7 +160,7 @@ pub mod sync {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
     use simplelog::*;
     use std::{thread, time};
 

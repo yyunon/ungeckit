@@ -1,4 +1,3 @@
-use reqwest::Method;
 use std::collections::HashMap;
 
 pub mod Driver {

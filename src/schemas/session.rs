@@ -1,6 +1,5 @@
 use bytes::Bytes;
 use serde::{self, de, Deserialize, Serialize};
-use std::error::Error;
 
 use crate::error::GeckError;
 

@@ -1,11 +1,10 @@
 use log::*;
-use std::error::Error;
 use std::io::{self};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
-use tokio::runtime::{Handle, Runtime, RuntimeMetrics};
+use tokio::runtime::{Handle, Runtime};
 use tokio::task::JoinHandle;
 
 use crate::error::GeckError;
