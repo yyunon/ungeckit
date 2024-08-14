@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 bytes = "1.7.1"
 futures = "0.3.30"
+handlebars = "6.0.0"
 log = "0.4.22"
 reqwest = "0.12.5"
 serde = { version = "1.0.206", features = ["derive"] }

@@ -79,3 +79,8 @@ pub struct Session {
 pub struct SessionResponse {
     pub value: Session,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Response<T> {
+    pub value: T,
+}

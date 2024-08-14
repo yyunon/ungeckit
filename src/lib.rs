@@ -1,11 +1,14 @@
 use core::str;
+use log::info;
 use reqwest::header::HeaderMap;
 use serde::de::{self};
+use serde_json::json;
 use std::convert::From;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
+use handlebars::Handlebars;
 use reqwest::{self, Method, Request, RequestBuilder, Url};
 
 pub mod constants;
@@ -22,9 +25,9 @@ pub async fn _request<'a>(
     client: &reqwest::Client,
     method: Method,
     url: &str,
+    data: String,
 ) -> Result<Bytes, GeckError> {
     let mut headers = HeaderMap::new();
-    let body = r#"{"capabilities": {"alwaysMatch": {"webSocketUrl": true}}}"#;
     headers.insert("Accept", "application/json".parse().unwrap());
     headers.insert(
         "Content-Type",
@@ -33,7 +36,7 @@ pub async fn _request<'a>(
     let request = Request::new(method, Url::parse(&url).expect("Cannot parse url"));
     let response = RequestBuilder::from_parts(client.clone(), request)
         .headers(headers)
-        .body(body)
+        .body(data)
         .send()
         .await?;
     if response.status() == 200 {
@@ -58,7 +61,7 @@ pub struct Driver<'a> {
 
 impl<'a> Driver<'a> {
     // TODO Create macro
-    fn new(remote_url: Option<String>) -> Result<Self, GeckError> {
+    pub fn new(remote_url: Option<String>) -> Result<Self, GeckError> {
         let mut driver_url = constants::Driver::HOST.to_owned() + ":" + constants::Driver::PORT;
         if let Some(url) = remote_url {
             driver_url = url;
@@ -82,7 +85,13 @@ impl<'a> Driver<'a> {
         })
     }
 
-    fn command<T>(&mut self, cmd: &str) -> Result<T, GeckError>
+    fn template_str(cmd: &str, args: &str) -> Result<String, GeckError> {
+        let mut handle = Handlebars::new();
+        handle.register_template_string("tpl_name", cmd).unwrap();
+        Ok(handle.render("tpl_name", &json!(serde_json::from_str::<serde_json::Value>(args).unwrap())).unwrap())
+    }
+    // TODO A better way to pass args
+    fn command<T>(&mut self, cmd: &str, args: &str, data: String) -> Result<T, GeckError>
     where
         T: de::DeserializeOwned,
     {
@@ -91,16 +100,33 @@ impl<'a> Driver<'a> {
         let firefox = &self.firefox;
         let cmd = firefox.command_dict.get(cmd).unwrap();
         let method = Method::from_str(&cmd.verb).unwrap();
-        let url = url.to_owned() + &cmd.path;
+        let url = url.to_owned() + &Driver::template_str(&cmd.path, args).unwrap();
         // TODO Macro
         let body = self
             .context
             .lock()
             .unwrap()
             .handle
-            .block_on(async move { _request(&client, method, &url).await })
+            .block_on(async move { _request(&client, method, &url, data).await })
             .unwrap();
         SchemaParser::try_parse_response(body)
+    }
+    pub fn get(&mut self, url: &str) -> Result<String, GeckError> {
+        let session = self
+            .command::<SessionResponse>(
+                "NEW_SESSION",
+                r#"{}"#,
+                r#"{"capabilities": {"alwaysMatch": {"webSocketUrl": true}}}"#.to_owned(),
+            )
+            .unwrap();
+        let page = self
+            .command::<Response<String>>(
+                "GET",
+                &format!(r#"{{"sessionId": "{}"}}"#, session.value.sessionId),
+                format!(r#"{{"url": "{}"}}"#, url),
+            )
+            .unwrap();
+        Ok(page.value)
     }
 }
 
@@ -141,7 +167,7 @@ pub mod sync {
             })
         }
 
-        pub async fn command<T>(&mut self, cmd: &str) -> Result<T, GeckError>
+        pub async fn command<T>(&mut self, cmd: &str, body: String) -> Result<T, GeckError>
         where
             T: de::DeserializeOwned,
         {
@@ -152,7 +178,7 @@ pub mod sync {
             let method = Method::from_str(&cmd.verb).unwrap();
             let url = url.to_owned() + &cmd.path;
             // TODO Macro
-            let body = _request(&client, method, &url).await?;
+            let body = _request(&client, method, &url, body).await?;
             SchemaParser::try_parse_response(body)
         }
     }
@@ -160,7 +186,7 @@ pub mod sync {
 
 #[cfg(test)]
 mod tests {
-    
+
     use simplelog::*;
     use std::{thread, time};
 
