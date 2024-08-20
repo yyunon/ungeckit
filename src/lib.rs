@@ -1,213 +1,90 @@
-use core::str;
-use log::info;
-use reqwest::header::HeaderMap;
-use serde::de::{self};
-use serde_json::json;
-use std::convert::From;
-use std::str::FromStr;
-use std::sync::{Arc, Mutex};
-
-use bytes::Bytes;
-use handlebars::Handlebars;
-use reqwest::{self, Method, Request, RequestBuilder, Url};
-
-pub mod constants;
-pub mod error;
+pub mod driver;
+pub mod driver_sync;
+pub mod options;
 pub mod schemas;
 pub mod service;
+pub mod utils;
 
-use constants::Firefox;
-use error::GeckError;
-use schemas::session::*;
-use service::*;
+use log::*;
+use crate::driver::WebDriver;
+use crate::options::{capabilities, Capabilities, DriverOptions};
+use crate::utils::error::GeckError;
 
-pub async fn _request<'a>(
-    client: &reqwest::Client,
-    method: Method,
-    url: &str,
-    data: String,
-) -> Result<Bytes, GeckError> {
-    let mut headers = HeaderMap::new();
-    headers.insert("Accept", "application/json".parse().unwrap());
-    headers.insert(
-        "Content-Type",
-        "application/json;charset=UTF-8".parse().unwrap(),
-    );
-    let request = Request::new(method, Url::parse(&url).expect("Cannot parse url"));
-    let response = RequestBuilder::from_parts(client.clone(), request)
-        .headers(headers)
-        .body(data)
-        .send()
-        .await?;
-    if response.status() == 200 {
-        Ok(response.bytes().await?)
-    } else {
-        Err(GeckError::new(
-            error::ErrorKind::Driver,
-            None::<GeckError>,
-            &format!("Response status is {}", response.status()),
+pub struct DriverBuilder {
+    pub options: Option<DriverOptions>,
+    pub capabilities: Option<Capabilities>,
+}
+
+impl DriverBuilder {
+    /// Builds the driver from Options, Context (Sync and Async engine), Driver parameters
+    // TODO Make macro
+    pub fn new(capabilities: Option<Capabilities>) -> Self {
+        Self {
+            options: None,
+            capabilities: capabilities,
+        }
+    }
+
+    /// Override options
+    pub fn options(&mut self, options: DriverOptions) -> Result<(), GeckError> {
+        self.options = Some(options);
+        Ok(())
+    }
+
+    /// Insert a new option
+    /// TODO: Make Macro
+    pub fn option(&mut self, option_type: &str, option: (&str, &str)) -> Result<(), GeckError> {
+        if !DriverOptions::option_types()
+            .iter()
+            .any(|&i| i == option_type)
+        {
+            panic!("Invalid option")
+        }
+        self.options.as_mut().unwrap().insert(option_type, option);
+        Ok(())
+    }
+
+    /// If no options provided, or some provided
+    pub fn setup_default_options(&mut self) -> Result<(), GeckError> {
+        self.options
+            .as_mut()
+            .unwrap()
+            .insert("--arg", ("-headless", ""));
+        self.options
+            .as_mut()
+            .unwrap()
+            .insert("--log", ("level", "trace"));
+        let cap = self.options.as_ref().unwrap().to_capabilities().unwrap();
+        self.capabilities.as_mut().unwrap().extend(cap);
+        Ok(())
+    }
+
+    /// If no capabilities provided, or some provided
+    pub fn setup_default_capabilities(&mut self) -> Result<(), GeckError> {
+        self.capabilities = Some(capabilities::DesiredCapabilities::FIREFOX.values());
+        self.capabilities
+            .as_mut()
+            .unwrap()
+            .insert("alwaysMatch", "webSocketUrl", true);
+        Ok(())
+    }
+
+    /// Builds a firefox driver
+    pub fn build(&mut self) -> Result<WebDriver, GeckError> {
+        // Setup options
+        self.options = Some(DriverOptions::new());
+        self.setup_default_capabilities();
+        self.setup_default_options();
+        Ok(WebDriver::new(
+            None,
+            serde_json::to_string(&self.capabilities.as_ref().unwrap()).unwrap(),
+            reqwest::Client::new(),
         ))
     }
-}
 
-pub struct Driver<'a> {
-    driver_url: String,
-    http_client: reqwest::Client,
-    sessions: Vec<String>,
-    service: Service,
-    context: Arc<Mutex<Context>>,
-    firefox: Firefox<'a>,
-}
-
-impl<'a> Driver<'a> {
-    // TODO Create macro
-    pub fn new(remote_url: Option<String>) -> Result<Self, GeckError> {
-        let mut driver_url = constants::Driver::HOST.to_owned() + ":" + constants::Driver::PORT;
-        if let Some(url) = remote_url {
-            driver_url = url;
-        }
-        let context = Context::new();
-        let mut service = Service::new(&context, &String::from("/home/yyunon/workspace/projects/freelance/scrape_pub/rust_gecko/rust_geck/binary/geckodriver"));
-        service
-            .start(Vec::from([
-                constants::Driver::ARGS_PORT,
-                constants::Driver::PORT,
-                constants::Driver::ARGS_VERBOSITY,
-            ]))
-            .expect("Failed to execute driver");
-        Ok(Self {
-            http_client: reqwest::Client::new(),
-            sessions: Vec::new(),
-            driver_url: String::from(driver_url),
-            context: context.clone(),
-            service: service,
-            firefox: constants::Firefox::new(),
-        })
-    }
-
-    fn template_str(cmd: &str, args: &str) -> Result<String, GeckError> {
-        let mut handle = Handlebars::new();
-        handle.register_template_string("tpl_name", cmd).unwrap();
-        Ok(handle.render("tpl_name", &json!(serde_json::from_str::<serde_json::Value>(args).unwrap())).unwrap())
-    }
-    // TODO A better way to pass args
-    fn command<T>(&mut self, cmd: &str, args: &str, data: String) -> Result<T, GeckError>
-    where
-        T: de::DeserializeOwned,
-    {
-        let client = self.http_client.clone();
-        let url = self.driver_url.clone();
-        let firefox = &self.firefox;
-        let cmd = firefox.command_dict.get(cmd).unwrap();
-        let method = Method::from_str(&cmd.verb).unwrap();
-        let url = url.to_owned() + &Driver::template_str(&cmd.path, args).unwrap();
-        // TODO Macro
-        let body = self
-            .context
-            .lock()
-            .unwrap()
-            .handle
-            .block_on(async move { _request(&client, method, &url, data).await })
-            .unwrap();
-        SchemaParser::try_parse_response(body)
-    }
-    pub fn get(&mut self, url: &str) -> Result<String, GeckError> {
-        let session = self
-            .command::<SessionResponse>(
-                "NEW_SESSION",
-                r#"{}"#,
-                r#"{"capabilities": {"alwaysMatch": {"webSocketUrl": true}}}"#.to_owned(),
-            )
-            .unwrap();
-        let page = self
-            .command::<Response<String>>(
-                "GET",
-                &format!(r#"{{"sessionId": "{}"}}"#, session.value.sessionId),
-                format!(r#"{{"url": "{}"}}"#, url),
-            )
-            .unwrap();
-        Ok(page.value)
-    }
-}
-
-pub mod sync {
-    use super::*;
-    pub struct Driver<'a> {
-        driver_url: String,
-        http_client: reqwest::Client,
-        sessions: Vec<String>,
-        service: Service,
-        context: Arc<Mutex<Context>>,
-        firefox: Firefox<'a>,
-    }
-
-    impl<'a> Driver<'a> {
-        // TODO Create macro
-        pub async fn new(remote_url: Option<String>) -> Result<Self, GeckError> {
-            let mut driver_url = constants::Driver::HOST.to_owned() + ":" + constants::Driver::PORT;
-            if let Some(url) = remote_url {
-                driver_url = url;
-            }
-            let context = Context::new();
-            let mut service = Service::new(&context, &String::from("/home/yyunon/workspace/projects/freelance/scrape_pub/rust_gecko/rust_geck/binary/geckodriver"));
-            service
-                .start_async(Vec::from([
-                    constants::Driver::ARGS_PORT,
-                    constants::Driver::PORT,
-                    constants::Driver::ARGS_VERBOSITY,
-                ]))
-                .await?;
-            Ok(Self {
-                http_client: reqwest::Client::new(),
-                sessions: Vec::new(),
-                driver_url: String::from(driver_url),
-                context: context.clone(),
-                service: service,
-                firefox: constants::Firefox::new(),
-            })
-        }
-
-        pub async fn command<T>(&mut self, cmd: &str, body: String) -> Result<T, GeckError>
-        where
-            T: de::DeserializeOwned,
-        {
-            let client = self.http_client.clone();
-            let url = self.driver_url.clone();
-            let firefox = &self.firefox;
-            let cmd = firefox.command_dict.get(cmd).unwrap();
-            let method = Method::from_str(&cmd.verb).unwrap();
-            let url = url.to_owned() + &cmd.path;
-            // TODO Macro
-            let body = _request(&client, method, &url, body).await?;
-            SchemaParser::try_parse_response(body)
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    use simplelog::*;
-    use std::{thread, time};
-
-    use super::constants;
-    #[test]
-    fn test_dict() {
-        let firefox = constants::Firefox::new();
-        assert_eq!(firefox.command_dict.get("get_context").unwrap().verb, "GET");
-    }
-
-    fn test_spawn() {
-        TermLogger::init(
-            LevelFilter::Info,
-            Config::default(),
-            TerminalMode::Mixed,
-            ColorChoice::Auto,
-        )
-        .unwrap();
-        let ten_millis = time::Duration::from_millis(500);
-        let now = time::Instant::now();
-        println!("Now running in main");
-        thread::sleep(ten_millis);
+    pub fn serialized_capabilities(&mut self) -> Result<String, GeckError> {
+        let cap = self.options.as_ref().unwrap().to_capabilities().unwrap();
+        self.capabilities.as_mut().unwrap().extend(cap);
+        Ok(serde_json::to_string(&self.capabilities).unwrap())
     }
 }

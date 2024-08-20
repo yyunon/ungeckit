@@ -1,7 +1,8 @@
+use log::*;
 use bytes::Bytes;
 use serde::{self, de, Deserialize, Serialize};
 
-use crate::error::GeckError;
+use crate::utils::error::GeckError;
 
 pub struct SchemaParser {}
 
@@ -30,49 +31,64 @@ pub struct Proxy {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Timeouts {
     pub implicit: i64,
-    pub pageLoad: i64,
+    #[serde(alias = "pageLoad")]
+    pub page_load: i64,
     pub script: i64,
 }
+
+pub fn none() -> String { return "".to_owned()}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Capabilities {
-    pub acceptInsecureCerts: bool,
-    pub browserName: String,
-    pub browserVersion: String,
+    #[serde(alias = "acceptInsecureCerts")]
+    pub accept_insecure_certs: bool,
+    #[serde(alias = "browserName")]
+    pub browser_name: String,
+    #[serde(alias = "browserVersion")]
+    pub browser_version: String,
     #[serde(alias = "moz:accessibilityChecks")]
-    pub moz_accessibilityChecks: bool,
+    pub moz_accessibility_checks: bool,
     #[serde(alias = "moz:buildID")]
-    pub moz_buildID: String,
-    #[serde(alias = "moz:debuggerAddress")]
-    pub moz_debuggerAddress: String,
+    pub moz_build_id: String,
+    #[serde(alias = "moz:debuggerAddress", default="none")]
+    pub moz_debugger_address: String,
     #[serde(alias = "moz:geckodriverVersion")]
-    pub moz_geckodriverVersion: String,
+    pub moz_geckodriver_version: String,
     #[serde(alias = "moz:headless")]
     pub moz_headless: bool,
     #[serde(alias = "moz:platformVersion")]
-    pub moz_platformVersion: String,
+    pub moz_platform_version: String,
     #[serde(alias = "moz:processID")]
-    pub moz_processID: i64,
+    pub moz_process_id: i64,
     #[serde(alias = "moz:profile")]
     pub moz_profile: String,
     #[serde(alias = "moz:shutdownTimeout")]
-    pub moz_shutdownTimeout: i64,
+    pub moz_shutdown_timeout: i64,
     #[serde(alias = "moz:webdriverClick")]
-    pub moz_webdriverClick: bool,
+    pub moz_webdriver_click: bool,
     #[serde(alias = "moz:windowless")]
     pub moz_windowless: bool,
-    pub pageLoadStrategy: String,
-    pub platformName: String,
+    #[serde(alias = "pageLoadStrategy")]
+    pub page_load_strategy: String,
+    #[serde(alias = "platformName")]
+    pub platform_name: String,
     pub proxy: Proxy,
-    pub setWindowRect: bool,
-    pub strictFileInteractability: bool,
+    #[serde(alias = "setWindowRect")]
+    pub set_window_rect: bool,
+    #[serde(alias = "strictFileInteractability")]
+    pub strict_file_interactability: bool,
     pub timeouts: Timeouts,
-    pub unhandledPromptBehavior: String,
-    pub userAgent: String,
-    pub webSocketUrl: String,
+    #[serde(alias = "unhandledPromptBehavior")]
+    pub unhandled_prompt_behavior: String,
+    #[serde(alias = "userAgent")]
+    pub user_agent: String,
+    #[serde(alias = "webSocketUrl")]
+    pub web_socket_url: String,
 }
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Session {
-    pub sessionId: String,
+    #[serde(alias = "sessionId")]
+    pub session_id: String,
     pub capabilities: Capabilities,
 }
 #[derive(Serialize, Deserialize, Debug)]
@@ -82,5 +98,5 @@ pub struct SessionResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Response<T> {
-    pub value: T,
+    pub value: Option<T>,
 }

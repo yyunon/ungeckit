@@ -1,5 +1,9 @@
-use std::collections::HashMap;
+use crate::utils::error::GeckError;
+use handlebars::Handlebars;
 use serde::{self, de, Deserialize, Serialize};
+use serde_json::json;
+/// Firefox level driver constants and commands
+use std::collections::HashMap;
 
 pub mod Driver {
     pub const HOST: &'static str = "http://127.0.0.1";
@@ -8,10 +12,22 @@ pub mod Driver {
     pub const ARGS_VERBOSITY: &'static str = "-v";
 }
 
+/// Generate template string to parse driver paths
+pub fn template_str(cmd: &str, args: &str) -> Result<String, GeckError> {
+    let mut handle = Handlebars::new();
+    handle.register_template_string("tpl_name", cmd).unwrap();
+    Ok(handle
+        .render(
+            "tpl_name",
+            &json!(serde_json::from_str::<serde_json::Value>(args).unwrap()),
+        )
+        .unwrap())
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CmdTemplate {
-	sessionId: String,
-	id: String,
+    sessionId: String,
+    id: String,
 }
 pub struct WebdriverCmd<'a> {
     pub verb: &'a str,
@@ -30,11 +46,11 @@ where
     }
 }
 
-pub struct Firefox<'a> {
+pub struct WebDriver<'a> {
     pub command_dict: HashMap<&'a str, WebdriverCmd<'a>>,
 }
 
-impl<'a> Firefox<'a> {
+impl<'a> WebDriver<'a> {
     pub fn new() -> Self {
         Self {
             command_dict: HashMap::from([
@@ -122,4 +138,7 @@ impl<'a> Firefox<'a> {
             ])
         }
     }
+		pub fn insert(&mut self, cmd: &'a str, request_verb: &'a str, request_path: &'a str) {
+			self.command_dict.insert(cmd, WebdriverCmd::from((request_verb, request_path)));
+		}
 }
