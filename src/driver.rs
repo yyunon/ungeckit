@@ -29,7 +29,7 @@ impl WebDriver {
         http_client: reqwest::Client,
     ) -> Self {
         let context = Context::new();
-        let mut service = Service::new(&context, &String::from("/home/yyunon/workspace/projects/freelance/scrape_pub/rust_gecko/rust_geck/binary/geckodriver"));
+        let mut service = Service::new(&context, &String::from("/tmp/geckodriver"));
 
         service
             .start(Vec::from([
