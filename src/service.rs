@@ -1,12 +1,12 @@
 use log::*;
-use tokio::net::unix::pipe::Receiver;
 use std::io::{self};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::sync::mpsc;
+use tokio::net::unix::pipe::Receiver;
 use tokio::process::Command;
 use tokio::runtime::{Handle, Runtime};
+use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
 use crate::utils::error::GeckError;
@@ -52,7 +52,7 @@ impl Context {
 pub struct Service {
     driver_path: String,
     context: Arc<Mutex<Context>>,
-		channel: (mpsc::Sender<String>, mpsc::Receiver<String>), // TODO: See if logs can be handled via this silently
+    channel: (mpsc::Sender<String>, mpsc::Receiver<String>), // TODO: See if logs can be handled via this silently
     geckodriver_service: Option<JoinHandle<Result<(), io::Error>>>,
     stdout_service: Option<JoinHandle<Result<(), io::Error>>>,
     stderr_service: Option<JoinHandle<Result<(), io::Error>>>,
@@ -62,7 +62,7 @@ impl Service {
         Self {
             driver_path: driver_path.clone(),
             context: context.clone(),
-						channel: mpsc::channel(32),
+            channel: mpsc::channel(32),
             geckodriver_service: None,
             stdout_service: None,
             stderr_service: None,
@@ -88,13 +88,13 @@ impl Service {
         let stderr = output.stderr.take().expect("Failed to take stderr!");
 
         // A task to to spawn to retrieve command output
-				let send_channel = self.channel.0.clone();
+        let send_channel = self.channel.0.clone();
         self.stdout_service = Some(tokio::spawn(async move {
             let mut reader = BufReader::new(stdout).lines();
             while let Some(line) = reader.next_line().await? {
-								if line.contains("Listening on") {
-									send_channel.send(line.clone()).await.unwrap();
-								}
+                if line.contains("Listening on") {
+                    send_channel.send(line.clone()).await.unwrap();
+                }
                 debug!("{}", line)
             }
             Ok(())
@@ -140,14 +140,14 @@ impl Service {
             let stderr = output.stderr.take().expect("Failed to take stderr!");
 
             // A task to to spawn to retrieve command output
-						let sender = self.channel.0.clone();
+            let sender = self.channel.0.clone();
             self.stdout_service = Some(tokio::spawn(async move {
                 let mut reader = BufReader::new(stdout).lines();
                 while let Some(line) = reader.next_line().await? {
                     debug!("{}", line);
-										if line.contains("INFO") || line.contains("TRACE") {
-											sender.send(line.clone()).await.unwrap();
-										}
+                    if line.contains("INFO") || line.contains("TRACE") {
+                        sender.send(line.clone()).await.unwrap();
+                    }
                 }
                 Ok(())
             }));
@@ -176,9 +176,14 @@ impl Service {
         Ok(())
     }
 
-		pub fn session_is_up(&mut self) -> Result<bool, GeckError>{
-			Ok(self.channel.1.blocking_recv().unwrap().contains("Listening on"))
-		}
+    pub fn session_is_up(&mut self) -> Result<bool, GeckError> {
+        Ok(self
+            .channel
+            .1
+            .blocking_recv()
+            .unwrap()
+            .contains("Listening on"))
+    }
 }
 
 impl Drop for Service {

@@ -138,7 +138,8 @@ impl<'a> WebDriver<'a> {
             ])
         }
     }
-		pub fn insert(&mut self, cmd: &'a str, request_verb: &'a str, request_path: &'a str) {
-			self.command_dict.insert(cmd, WebdriverCmd::from((request_verb, request_path)));
-		}
+    pub fn insert(&mut self, cmd: &'a str, request_verb: &'a str, request_path: &'a str) {
+        self.command_dict
+            .insert(cmd, WebdriverCmd::from((request_verb, request_path)));
+    }
 }

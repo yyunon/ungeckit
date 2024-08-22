@@ -5,10 +5,10 @@ pub mod schemas;
 pub mod service;
 pub mod utils;
 
-use log::*;
 use crate::driver::WebDriver;
 use crate::options::{capabilities, Capabilities, DriverOptions};
 use crate::utils::error::GeckError;
+use log::*;
 
 pub struct DriverBuilder {
     pub options: Option<DriverOptions>,

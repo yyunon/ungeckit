@@ -1,10 +1,10 @@
-use core::{panic, str};
 use base64::prelude::*;
-use std::io::Write;
-use std::fs::{self, OpenOptions};
+use core::{panic, str};
 use log::info;
 use serde::de::{self};
 use std::convert::From;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::sync::{Arc, Mutex};
 
 use crate::options::{capabilities, Capabilities, DriverOptions};
@@ -29,7 +29,7 @@ impl WebDriver {
         http_client: reqwest::Client,
     ) -> Self {
         let context = Context::new();
-        let mut service = Service::new(&context, &String::from("/tmp/geckodriver"));
+        let mut service = Service::new(&context, &String::from("geckodriver"));
 
         service
             .start(Vec::from([
@@ -39,20 +39,33 @@ impl WebDriver {
             ]))
             .expect("Failed to execute driver");
 
-        let mut driver_url = webdriver_commands::Driver::HOST.to_owned() + ":" + webdriver_commands::Driver::PORT;
+        let mut driver_url =
+            webdriver_commands::Driver::HOST.to_owned() + ":" + webdriver_commands::Driver::PORT;
         if let Some(url) = remote_url {
             driver_url = url;
         }
-				while !service.session_is_up().unwrap() {
-					info!("Session is booting up, give it more seconds...");
-				}
+        while !service.session_is_up().unwrap() {
+            info!("Session is booting up, give it more seconds...");
+        }
 
-				let mut cmds = webdriver_commands::WebDriver::new();
-				cmds.insert("GET_CONTEXT", "GET", "/session/{{sessionId}}/moz/context");
-				cmds.insert("SET_CONTEXT", "POST", "/session/{{sessionId}}/moz/context");
-				cmds.insert("INSTALL_ADDON", "POST", "/session/{{sessionId}}/moz/addon/install");
-				cmds.insert("UNINSTALL_ADDON", "POST", "/session/{{sessionId}}/moz/addon/uninstall");
-				cmds.insert("FULL_PAGE_SCREENSHOT", "GET", "/session/{{sessionId}}/moz/screenshot/full");
+        let mut cmds = webdriver_commands::WebDriver::new();
+        cmds.insert("GET_CONTEXT", "GET", "/session/{{sessionId}}/moz/context");
+        cmds.insert("SET_CONTEXT", "POST", "/session/{{sessionId}}/moz/context");
+        cmds.insert(
+            "INSTALL_ADDON",
+            "POST",
+            "/session/{{sessionId}}/moz/addon/install",
+        );
+        cmds.insert(
+            "UNINSTALL_ADDON",
+            "POST",
+            "/session/{{sessionId}}/moz/addon/uninstall",
+        );
+        cmds.insert(
+            "FULL_PAGE_SCREENSHOT",
+            "GET",
+            "/session/{{sessionId}}/moz/screenshot/full",
+        );
 
         Self {
             service: service,
@@ -67,7 +80,7 @@ impl WebDriver {
 
     /// Generates a session per driver, we maintain a single session per driver at this point
     pub fn new_session(&mut self) -> Result<(), GeckError> {
-			info!("{:?}", self.capabilities);
+        info!("{:?}", self.capabilities);
         let session = self
             .command::<SessionResponse>("NEW_SESSION", r#"{}"#, self.capabilities.clone())
             .unwrap();
@@ -109,20 +122,23 @@ impl WebDriver {
             None => self.new_session().unwrap(),
         };
 
-        let screenshot = self.command::<Response<String>>(
-            "FULL_PAGE_SCREENSHOT",
-            &format!(
-                r#"{{"sessionId": "{}"}}"#,
-                self.session.as_ref().unwrap().session_id
-            ),
-            "".to_owned(),
-        )
-        .unwrap().value.unwrap();
+        let screenshot = self
+            .command::<Response<String>>(
+                "FULL_PAGE_SCREENSHOT",
+                &format!(
+                    r#"{{"sessionId": "{}"}}"#,
+                    self.session.as_ref().unwrap().session_id
+                ),
+                "".to_owned(),
+            )
+            .unwrap()
+            .value
+            .unwrap();
 
-				let img_bytes = BASE64_STANDARD.decode(screenshot.as_bytes()).unwrap();
-				//let img_bytes = screenshot.as_bytes();
-				let mut file = fs::OpenOptions::new().write(true).open(path).unwrap();
-				file.write_all(&img_bytes).unwrap();
+        let img_bytes = BASE64_STANDARD.decode(screenshot.as_bytes()).unwrap();
+        //let img_bytes = screenshot.as_bytes();
+        let mut file = fs::OpenOptions::new().write(true).open(path).unwrap();
+        file.write_all(&img_bytes).unwrap();
 
         Ok(())
     }
@@ -150,12 +166,10 @@ impl WebDriver {
         let cmd = firefox.command_dict.get(cmd).unwrap();
         let url = url.to_owned() + &webdriver_commands::template_str(&cmd.path, args).unwrap();
         // TODO Macro
-        let body = self
-            .context
-            .lock()
-            .unwrap()
-            .handle
-            .block_on(async move { net::request(&client, &cmd.verb, &url, data).await.unwrap() });
+        let body =
+            self.context.lock().unwrap().handle.block_on(async move {
+                net::request(&client, &cmd.verb, &url, data).await.unwrap()
+            });
         SchemaParser::try_parse_response(body)
     }
 }
@@ -172,5 +186,4 @@ mod tests {
         let firefox = webdriver_commands::Firefox::new();
         assert_eq!(firefox.command_dict.get("get_context").unwrap().verb, "GET");
     }
-
 }

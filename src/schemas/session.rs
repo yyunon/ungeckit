@@ -1,5 +1,5 @@
-use log::*;
 use bytes::Bytes;
+use log::*;
 use serde::{self, de, Deserialize, Serialize};
 
 use crate::utils::error::GeckError;
@@ -36,7 +36,9 @@ pub struct Timeouts {
     pub script: i64,
 }
 
-pub fn none() -> String { return "".to_owned()}
+pub fn none() -> String {
+    return "".to_owned();
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Capabilities {
@@ -50,7 +52,7 @@ pub struct Capabilities {
     pub moz_accessibility_checks: bool,
     #[serde(alias = "moz:buildID")]
     pub moz_build_id: String,
-    #[serde(alias = "moz:debuggerAddress", default="none")]
+    #[serde(alias = "moz:debuggerAddress", default = "none")]
     pub moz_debugger_address: String,
     #[serde(alias = "moz:geckodriverVersion")]
     pub moz_geckodriver_version: String,
