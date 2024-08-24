@@ -46,10 +46,10 @@ impl DriverBuilder {
 
     /// If no options provided, or some provided
     pub fn setup_default_options(&mut self) -> Result<(), GeckError> {
-        self.options
-            .as_mut()
-            .unwrap()
-            .insert("--arg", ("-headless", ""));
+        //self.options
+        //    .as_mut()
+        //    .unwrap()
+        //    .insert("--arg", ("-headless", ""));
         self.options
             .as_mut()
             .unwrap()

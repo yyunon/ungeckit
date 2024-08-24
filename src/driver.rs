@@ -4,6 +4,7 @@ use log::info;
 use serde::de::{self};
 use std::convert::From;
 use std::fs::{self, OpenOptions};
+use std::path::Path;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 
@@ -15,6 +16,7 @@ use crate::utils::*;
 
 pub struct WebDriver {
     pub service: Service,
+    pub open_page: Option<String>,
     pub context: Arc<Mutex<Context>>,
     pub session: Option<Session>,
     pub capabilities: String,
@@ -69,6 +71,7 @@ impl WebDriver {
 
         Self {
             service: service,
+            open_page: None,
             context: context,
             session: None,
             capabilities: capabilities,
@@ -90,7 +93,7 @@ impl WebDriver {
 
     pub fn get(&mut self, url: &str) -> Result<String, GeckError> {
         match &self.session {
-            Some(sess) => (),
+            Some(_) => (),
             None => self.new_session().unwrap(),
         };
 
@@ -113,12 +116,32 @@ impl WebDriver {
                 format!(r#"{{"url": "{}"}}"#, url),
             )
             .unwrap();
+        self.open_page = Some(url.to_owned());
         Ok(page_source.value.unwrap())
+    }
+
+    pub fn execute_script(&mut self) -> Result<String, GeckError>{
+        match &self.session {
+            Some(_) => (),
+            None => self.new_session().unwrap(),
+        };
+        let data = r#"{"script": "[Object.defineProperty("navc)]"}"#;
+        let result = self
+            .command::<Response<String>>(
+                "W3C_EXECUTE_SCRIPT",
+                &format!(
+                    r#"{{"sessionId": "{}"}}"#,
+                    self.session.as_ref().unwrap().session_id
+                ),
+                data.to_owned()
+            )
+            .unwrap();
+        Ok(result.value.unwrap())
     }
 
     pub fn save_screenshot(&mut self, path: &str) -> Result<(), GeckError> {
         match &self.session {
-            Some(sess) => (),
+            Some(_) => (),
             None => self.new_session().unwrap(),
         };
 
@@ -136,9 +159,13 @@ impl WebDriver {
             .unwrap();
 
         let img_bytes = BASE64_STANDARD.decode(screenshot.as_bytes()).unwrap();
-        //let img_bytes = screenshot.as_bytes();
-        let mut file = fs::OpenOptions::new().write(true).open(path).unwrap();
-        file.write_all(&img_bytes).unwrap();
+        if Path::new(path).exists() {
+            let mut file = fs::OpenOptions::new().write(true).open(path).unwrap();
+            file.write_all(&img_bytes).unwrap();
+        } else {
+            let mut file = fs::File::create(path).unwrap();
+            file.write_all(&img_bytes).unwrap();
+        }
 
         Ok(())
     }

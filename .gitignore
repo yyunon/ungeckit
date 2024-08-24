@@ -3,3 +3,4 @@
 *.txt
 binary
 **/test.png
+*.code-workspace
