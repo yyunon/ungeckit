@@ -199,7 +199,7 @@ pub mod sync {
             let cmd = firefox.command_dict.get(cmd).unwrap();
             let url = url.to_owned() + &webdriver_commands::template_str(&cmd.path, args).unwrap();
             // TODO Macro
-            let body = net::request(&client, &cmd.verb, &url, data).await.unwrap();
+            let body = net::http::request(&client, &cmd.verb, &url, data).await.unwrap();
             SchemaParser::try_parse_response(body)
         }
     }

@@ -120,12 +120,12 @@ impl WebDriver {
         Ok(page_source.value.unwrap())
     }
 
-    pub fn execute_script(&mut self) -> Result<String, GeckError>{
+    pub fn execute_script(&mut self, script: &str, args: &str) -> Result<String, GeckError>{
         match &self.session {
             Some(_) => (),
             None => self.new_session().unwrap(),
         };
-        let data = r#"{"script": "[Object.defineProperty("navc)]"}"#;
+        let data = format!(r#"{{"script": "{script}", args: {args}}}"#);
         let result = self
             .command::<Response<String>>(
                 "W3C_EXECUTE_SCRIPT",
@@ -133,12 +133,14 @@ impl WebDriver {
                     r#"{{"sessionId": "{}"}}"#,
                     self.session.as_ref().unwrap().session_id
                 ),
-                data.to_owned()
+                data
             )
             .unwrap();
         Ok(result.value.unwrap())
     }
 
+    /// Save the screenshot of the webpage, uses moz capabilities full screenshot option.
+    /// Creates the file if not exists.
     pub fn save_screenshot(&mut self, path: &str) -> Result<(), GeckError> {
         match &self.session {
             Some(_) => (),
@@ -195,7 +197,7 @@ impl WebDriver {
         // TODO Macro
         let body =
             self.context.lock().unwrap().handle.block_on(async move {
-                net::request(&client, &cmd.verb, &url, data).await.unwrap()
+                net::http::request(&client, &cmd.verb, &url, data).await.unwrap()
             });
         SchemaParser::try_parse_response(body)
     }

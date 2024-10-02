@@ -69,6 +69,7 @@ impl Service {
         }
     }
 
+    /// Starts the async service to be used with the async context
     pub async fn start_async(
         &mut self,
         args: Vec<&'static str>,
@@ -123,6 +124,7 @@ impl Service {
         Ok(())
     }
 
+    /// Starts the services on the background. Designed to be used on blocking functions.
     pub fn start(&mut self, args: Vec<&'static str>) -> std::result::Result<(), GeckError> {
         let d_path = self.driver_path.clone();
         let c_args = args.clone();

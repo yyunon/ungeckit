@@ -4,6 +4,7 @@ pub mod options;
 pub mod schemas;
 pub mod service;
 pub mod utils;
+pub mod cdp;
 
 use crate::driver::WebDriver;
 use crate::options::{capabilities, Capabilities, DriverOptions};
@@ -80,6 +81,18 @@ impl DriverBuilder {
             serde_json::to_string(&self.capabilities.as_ref().unwrap()).unwrap(),
             reqwest::Client::new(),
         ))
+    }
+
+    pub async fn build_async(&mut self) -> Result<driver_sync::sync::WebDriver, GeckError> {
+        // Setup options
+        self.options = Some(DriverOptions::new());
+        self.setup_default_capabilities();
+        self.setup_default_options();
+        Ok(driver_sync::sync::WebDriver::new(
+            None,
+            serde_json::to_string(&self.capabilities.as_ref().unwrap()).unwrap(),
+            reqwest::Client::new(),
+        ).await)
     }
 
     pub fn serialized_capabilities(&mut self) -> Result<String, GeckError> {
