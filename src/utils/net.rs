@@ -38,12 +38,12 @@ pub mod http {
 }
 
 pub mod ws {
-    use futures_util::stream::SplitSink;
+    use futures::prelude::*;
+    use futures_util::stream::{SplitSink, SplitStream};
+    use serde::Deserialize;
     use tokio::net::TcpStream;
     use log::*;
     use tokio_tungstenite::{self, MaybeTlsStream, WebSocketStream};
-    use std::borrow::BorrowMut;
-    use std::future::IntoFuture;
     use std::sync::{Arc, Mutex};
     use crate::service::Context;
     use futures_util::{future, pin_mut, SinkExt, StreamExt};
@@ -55,6 +55,8 @@ pub mod ws {
         pub context: Arc<Mutex<Context>>,
         session_id: String,
         ws_url: String,
+        id: i32,
+        write: Option<SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>>,
         rx: mpsc::UnboundedReceiver<Message>,
         tx: mpsc::UnboundedSender<Message>,
     }
@@ -66,32 +68,63 @@ pub mod ws {
                 context: context,
                 session_id: session_id.to_owned(),
                 ws_url: ws_url.to_owned(),
+                id: 0,
+                write:None,
                 tx: ch.0,
                 rx: ch.1,
             }
         }
 
-        pub async fn connect_async(&mut self, url: &str) {
+        pub async fn connect_async(&mut self) {
             let (tx, rx) = (&mut self.tx, &self.rx) ;
-            let (ws_stream, _) = connect_async(url).await.expect("Cannot create connection");
+            let (ws_stream, _) = connect_async(self.ws_url.clone()).await.expect("Cannot create connection");
             let (write, read) = ws_stream.split();
+            self.write = Some(write);
+            let hand = tokio::runtime::Handle::try_current().unwrap();
+            hand.spawn( async move {
+                read.for_each(|message| async move {
+                    let data = message.unwrap();
+                    //log::debug!("{:?}", data);
+                }).await;
+            });
+            debug!("Successfully connected to the websocket stream");
+        }
+
+        pub fn connect(&mut self) {
+            let ctx = self.context.clone();
+            ctx.lock().unwrap().handle.block_on(async move {
+                let (ws_stream, _) = connect_async(self.ws_url.clone()).await.expect("Cannot create connection");
+                let (write, read) = ws_stream.split();
+                self.write = Some(write);
+                let hand = tokio::runtime::Handle::try_current().unwrap();
+                hand.spawn( async move {
+                    read.for_each(|message| async move {
+                        let data = message.unwrap();
+                        log::debug!("{:?}", data);
+                    }).await;
+                });
+            });
+            debug!("Successfully connected to the websocket stream");
         }
 
         pub fn send(&mut self, msg: &str) {
-            let (tx, rx) = (&mut self.tx, &self.rx) ;
-            let url: &str = self.ws_url.as_ref();
+            let write = self.write.as_mut().unwrap();
             self.context.lock().unwrap().handle.block_on(async move {
-                let (ws_stream, _) = connect_async(url).await.expect("Cannot create connection");
-                debug!("Successfully connected to the websocket stream");
-                let (mut write, read) = ws_stream.split();
-                let sender_s = write.send(msg.into());
-                let writer_s = read.for_each(|message| async {
-                    let data = message.unwrap();
-                    debug!("{:?}", data);
-                });
-                tokio::select! {
-                    _ = sender_s => {}
-                    _ = writer_s => {}
+                match write.send(msg.into()).await {
+                    Ok(_) => {}
+                    Err(e) => log::error!("{:?}", e)
+                }
+            });
+        }
+
+        pub fn send_all(&mut self, msgs: Vec<String>) {
+            let write = self.write.as_mut().unwrap();
+            self.context.lock().unwrap().handle.block_on(async move {
+                for msg in msgs {
+                    match write.send(msg.into()).await {
+                        Ok(data) => {log::debug!("{:?}", data)}
+                        Err(e) => log::error!("{:?}", e)
+                    }
                 }
             });
 

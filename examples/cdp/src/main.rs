@@ -12,6 +12,7 @@ fn main() {
     let ws_url = format!("ws://127.0.0.1:9222/session/{}", session_id);
     //let ws_url = "ws://127.0.0.1:9222";
     let mut ws = ws::WebSocketClient::new(context, session_id, &ws_url);
+    ws.connect();
     //let cmd = format!(r#"{{"id": {}, "cmd": "protocol"}}"#, session_id);
     //let url = r#"/json/protocol"#;
     //let cmd = r#"{"method": "/json/protocol", "params": "", "waitingForDebugger":""}"#;
@@ -21,7 +22,7 @@ fn main() {
     cmdList.push(String::from(cmd));
     cmd = r#"{"id": 2, "method": "browser.createUserContext", "params": {}}"#;
     cmdList.push(String::from(cmd));
-    ws.send(cmdList);
+    ws.send_all(cmdList);
     //let mut options = options::Options::new();
     //let page = driver.get("https://nowsecure.nl");
     //let page = driver.get("https://bot.sannysoft.com/");
