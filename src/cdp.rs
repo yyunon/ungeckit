@@ -1,7 +1,7 @@
 /*
 Holds the logic to communicate with dev tools via CDP
  */
-use crate::utils::error::GeckError;
+use crate::utils::error::{ErrorKind, GeckError};
 use crate::utils::webdriver_commands::WebdriverCmd;
 use crate::utils::net::ws::WebSocketClient;
 use crate::service::Context;
@@ -54,6 +54,9 @@ impl CDP {
         let message = format!(r#"{{"id": {}, "method":"{}", "params":{} }}"#, self.id, command, params);
         let data = self.ws_client.send(&message)?.into_text()?;
         let parsed_msg: CDPMessage = serde_json::from_str(&data).unwrap();
+        if parsed_msg.m_type != "success" || parsed_msg.id != self.id {
+            return Err(GeckError::new(ErrorKind::Driver, Some("None"), &format!("Failed to parse successful message for {:?}", data)));
+        }
         self.id +=1;
         Ok(parsed_msg)
     }
