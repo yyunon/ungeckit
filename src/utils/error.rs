@@ -64,6 +64,12 @@ impl From<reqwest::Error> for GeckError {
     }
 }
 
+impl From<tokio_tungstenite::tungstenite::error::Error> for GeckError {
+    fn from(err: tokio_tungstenite::tungstenite::error::Error) -> GeckError {
+        GeckError::new(ErrorKind::Driver, Some(err), "Service Failed")
+    }
+}
+
 #[derive(Debug)]
 pub enum ErrorKind {
     Driver,

@@ -38,38 +38,31 @@ pub mod http {
 }
 
 pub mod ws {
-    use futures::prelude::*;
-    use futures_util::stream::{SplitSink, SplitStream};
-    use serde::Deserialize;
     use tokio::net::TcpStream;
     use log::*;
     use tokio_tungstenite::{self, MaybeTlsStream, WebSocketStream};
     use std::sync::{Arc, Mutex};
     use crate::service::Context;
-    use futures_util::{future, pin_mut, SinkExt, StreamExt};
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use crate::utils::error::GeckError;
+    use futures_util::{SinkExt, StreamExt};
     use tokio::sync::mpsc;
     use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
     // TODO Move CDP in here!!!
     pub struct WebSocketClient {
         pub context: Arc<Mutex<Context>>,
-        session_id: String,
         ws_url: String,
-        id: i32,
-        write: Option<SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>>,
+        ws_stream: Option<WebSocketStream<MaybeTlsStream<TcpStream>>>,
         rx: mpsc::UnboundedReceiver<Message>,
         tx: mpsc::UnboundedSender<Message>,
     }
 
     impl WebSocketClient {
-        pub fn new(context: Arc<Mutex<Context>>, session_id: &str, ws_url: &str) -> Self {
+        pub fn new(context: Arc<Mutex<Context>>, ws_url: &str) -> Self {
             let ch = mpsc::unbounded_channel();
             Self {
                 context: context,
-                session_id: session_id.to_owned(),
                 ws_url: ws_url.to_owned(),
-                id: 0,
-                write:None,
+                ws_stream: None,
                 tx: ch.0,
                 rx: ch.1,
             }
@@ -78,15 +71,7 @@ pub mod ws {
         pub async fn connect_async(&mut self) {
             let (tx, rx) = (&mut self.tx, &self.rx) ;
             let (ws_stream, _) = connect_async(self.ws_url.clone()).await.expect("Cannot create connection");
-            let (write, read) = ws_stream.split();
-            self.write = Some(write);
-            let hand = tokio::runtime::Handle::try_current().unwrap();
-            hand.spawn( async move {
-                read.for_each(|message| async move {
-                    let data = message.unwrap();
-                    //log::debug!("{:?}", data);
-                }).await;
-            });
+            self.ws_stream = Some(ws_stream);
             debug!("Successfully connected to the websocket stream");
         }
 
@@ -94,41 +79,31 @@ pub mod ws {
             let ctx = self.context.clone();
             ctx.lock().unwrap().handle.block_on(async move {
                 let (ws_stream, _) = connect_async(self.ws_url.clone()).await.expect("Cannot create connection");
-                let (write, read) = ws_stream.split();
-                self.write = Some(write);
-                let hand = tokio::runtime::Handle::try_current().unwrap();
-                hand.spawn( async move {
-                    read.for_each(|message| async move {
-                        let data = message.unwrap();
-                        log::debug!("{:?}", data);
-                    }).await;
-                });
+                self.ws_stream = Some(ws_stream);
             });
             debug!("Successfully connected to the websocket stream");
         }
 
-        pub fn send(&mut self, msg: &str) {
-            let write = self.write.as_mut().unwrap();
-            self.context.lock().unwrap().handle.block_on(async move {
-                match write.send(msg.into()).await {
-                    Ok(_) => {}
+        pub fn send(&mut self, msg: &str) -> Result<Message, GeckError> {
+            let ctx = self.context.clone();
+            let sc = self.ws_stream.as_mut().unwrap();
+            let parsed_msg = ctx.lock().unwrap().handle.block_on(async move {
+                match sc.send(msg.into()).await {
+                    Ok(data) => {log::debug!("Message is sent successfully {:?}", data)}
                     Err(e) => log::error!("{:?}", e)
                 }
+                // Handle Remote Agent errors
+                if let Some(message) = sc.next().await {
+                    let data = message.unwrap();
+                    log::debug!("Response message is: {:?}", data);
+                    return Some(data);
+                } 
+                None
             });
+            assert!(parsed_msg != None, "WebSocketClient couldn't retrieve the response message");
+            Ok(parsed_msg.unwrap())
         }
 
-        pub fn send_all(&mut self, msgs: Vec<String>) {
-            let write = self.write.as_mut().unwrap();
-            self.context.lock().unwrap().handle.block_on(async move {
-                for msg in msgs {
-                    match write.send(msg.into()).await {
-                        Ok(data) => {log::debug!("{:?}", data)}
-                        Err(e) => log::error!("{:?}", e)
-                    }
-                }
-            });
-
-        }
     }
 
 }
