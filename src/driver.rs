@@ -212,7 +212,7 @@ mod tests {
     use super::webdriver_commands;
     #[test]
     fn test_dict() {
-        let firefox = webdriver_commands::Firefox::new();
-        assert_eq!(firefox.command_dict.get("get_context").unwrap().verb, "GET");
+        let firefox = webdriver_commands::WebDriver::new();
+        assert_eq!(firefox.command_dict.get("NEW_SESSION").unwrap().verb, "POST");
     }
 }
