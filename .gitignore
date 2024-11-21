@@ -1,7 +1,13 @@
+#Build and test
 **/target/
 **/*.lock
 *.txt
 binary
 **/test.png
+
+#VSCode
 *.code-workspace
+
+#Project management
 xclip
+todo
