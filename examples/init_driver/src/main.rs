@@ -1,27 +1,25 @@
-use std::{thread, time};
+use std::{thread, time, fs};
 use serde_json;
-use rust_geck::*;
-use rust_geck::utils::net::ws;
+use ungeckit::driver::*;
+use ungeckit::*;
+use ungeckit::utils::net::ws;
 use simplelog::*;
 
 fn main() {
     TermLogger::init(LevelFilter::Debug, Config::default(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
+    if(fs::exists("intoli.png").unwrap()) {
+        fs::remove_file("intoli.png").unwrap();
+        save_screenshot!("https://intoli.com/blog/not-possible-to-block-chrome-headless/chrome-headless-test.html", "intoli.png");
+    }
+    if(fs::exists("sannysoft.png").unwrap()) {
+        fs::remove_file("sannysoft.png").unwrap();
+        save_screenshot!("https://bot.sannysoft.com/", "sannysoft.png");
+    }
 
-    let context = service::Context::new();
-    let mut options = options::Options::new();
-    let page = driver.get("https://nowsecure.nl");
-    //let page = driver.get("https://bot.sannysoft.com/");
-    //let page = driver.get("https://intoli.com/blog/not-possible-to-block-chrome-headless/chrome-headless-test.html");
-    driver.save_screenshot("test.png");
-    //driver.execute_script();
-
-    //println!("{}", screenshot.unwrap());
-
-    //let cap = driver.options.to_capabilities();
-    //println!("{:?}", serde_json::to_string(&desired_capabilities).unwrap());
+    
+    // In case timing is needed!
     //let ten_millis = time::Duration::from_millis(5000);
     //let now = time::Instant::now();
-    //println!("Now running in main");
     //thread::sleep(ten_millis);
 
 }

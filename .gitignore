@@ -3,7 +3,7 @@
 **/*.lock
 *.txt
 binary
-**/test.png
+**/*.png
 
 #VSCode
 *.code-workspace

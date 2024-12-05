@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::options::{capabilities, Capabilities, DriverOptions};
 use crate::schemas::session::{self, *};
-use crate::service::*;
+use crate::{cdp::*, service::*};
 use crate::utils::error::GeckError;
 use crate::utils::*;
 
@@ -18,6 +18,7 @@ pub struct WebDriver {
     pub service: Service,
     pub open_page: Option<String>,
     pub context: Arc<Mutex<Context>>,
+    pub cdp: Option<CDP>,
     pub session: Option<Session>,
     pub capabilities: String,
     pub driver_url: String,
@@ -73,6 +74,7 @@ impl WebDriver {
             service: service,
             open_page: None,
             context: context,
+            cdp: None,
             session: None,
             capabilities: capabilities,
             driver_url: driver_url,
@@ -88,6 +90,19 @@ impl WebDriver {
             .command::<SessionResponse>("NEW_SESSION", r#"{}"#, self.capabilities.clone())
             .unwrap();
         self.session = Some(session.value);
+
+        let ws_url = &self.session.as_ref().unwrap().capabilities.web_socket_url;
+        let mut cdp = CDP::new(self.context.clone(), &ws_url);
+
+        // TODO CAN BE BETTER DONE? 
+        // Everytime we create a session we pass some commands to websocket
+        // Credits to: https://github.com/ultrafunkamsterdam/undetected-chromedriver/blob/master/undetected_chromedriver/__init__.py
+        let mut resp = cdp.send("session.subscribe", r#"{"events":["browsingContext.domContentLoaded"]}"#).unwrap();
+        resp = cdp.send("browser.createUserContext", "{}").unwrap();
+        let mut userContext = &resp["result"]["userContext"].as_str().unwrap();
+        //cdp.send("Page.addScriptToEvaluateOnNewDocument", "").unwrap();
+        self.cdp = Some(cdp);
+
         Ok(())
     }
 
@@ -120,6 +135,7 @@ impl WebDriver {
         Ok(page_source.value.unwrap())
     }
 
+    /// Execute a W3C script
     pub fn execute_script(&mut self, script: &str, args: &str) -> Result<String, GeckError>{
         match &self.session {
             Some(_) => (),
